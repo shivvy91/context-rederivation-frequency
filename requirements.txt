@@ -1,0 +1,9 @@
+duckdb>=1.0
+pyarrow>=14
+pandas>=2.0
+tiktoken>=0.7
+huggingface_hub>=0.23
+matplotlib>=3.7
+tokenizers>=0.19   # only for --tokenizer qwen
+pytest>=8          # only for the tests
+nbformat>=5        # only for scripts/build_notebook.py
