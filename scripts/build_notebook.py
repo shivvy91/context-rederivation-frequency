@@ -16,11 +16,11 @@ This notebook measures it on **67,074 public coding-agent trajectories**
 ([nebius/SWE-rebench-openhands-trajectories](https://huggingface.co/datasets/nebius/SWE-rebench-openhands-trajectories), CC-BY-4.0):
 Python counts the tokens in every message, and DuckDB SQL turns those counts into the metric.
 
-**To run:** *Runtime → Run all.* The full run takes about 30 minutes on Colab's free CPU and needs no account
+**To run:** *Runtime → Run all.* The full run takes about 55 minutes on Colab's free CPU and needs no account
 or API key. For a 3-minute trial first, set `SAMPLE_FRAC = 0.05` below. The last cell downloads
 `results.zip`: a summary, two charts and the per-task table."""
 
-PARAMS = """SAMPLE_FRAC = 1.0    # 1.0 = all 67,074 tasks (about 30 min). 0.05 = a 5% trial (about 3 min).
+PARAMS = """SAMPLE_FRAC = 1.0    # 1.0 = all 67,074 tasks (about 55 min). 0.05 = a 5% trial (about 3 min).
 TOKENIZER = "o200k"  # "o200k" (fast) or "qwen" (the generating model's own tokenizer, about 3x slower)"""
 
 SETUP = """!pip install -q duckdb tiktoken huggingface_hub
