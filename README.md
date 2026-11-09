@@ -1,8 +1,8 @@
 # Context re-derivation frequency
 
 **How much of what an AI agent sends to the model has it already sent before?** This repository measures it
-on 67,074 public coding-agent trajectories, in Python and DuckDB SQL. It is the Tier 0 measurement for
-[*The Constraint Premium*](https://shivshankarsingh.com/research/), a thesis arguing that as AI inference
+on 67,074 public coding-agent trajectories, in Python and DuckDB SQL. It runs the public-trajectory part of
+Tier 0 in the measurement plan of [*The Constraint Premium*](https://shivshankarsingh.com/research/), a thesis arguing that as AI inference
 gets cheap, the cost that matters in an agentic enterprise is context: meaning re-derived on every execution
 instead of defined once.
 
@@ -13,7 +13,22 @@ instead of defined once.
 
 ## Results
 
-<!-- After your run, replace this comment with the bullet list under "Paste into README → Results" in results/summary.md. -->
+All 67,074 tasks, run on 4 November 2026 in 53 minutes on Colab's free CPU; tokens counted with `o200k_base`.
+
+- The agent sent the model **133.4 billion input tokens, and 97.5% of them had already been sent earlier in
+  the same task.** Only 2.5% was new.
+- The median task made 61 model calls and had an RDF of 97.2% (10th–90th percentile: 96.2%–98.1%).
+- Measured RDF sits a median 0.5 percentage points above the closed form 1 − 2/(n+1). The gap is mostly the
+  fixed preamble: every call opens with a median 6,716 tokens of tool definitions, system prompt and task
+  statement, about ten times what a typical step adds.
+- At a fixed number of calls RDF barely varies: the 10th and 90th percentile tasks sit 0.5 points apart. In
+  this append-only harness, loop length alone predicts RDF.
+- Re-sending that preamble with every call accounts for 22.1% of all input tokens.
+- Unresolved tasks ran longer: a median 67 calls and 2.01 million input tokens, against 56 calls and
+  1.48 million for resolved ones.
+- Modeled cost share (CACS): re-sent input is 94.3% of spend with no caching and 59.7% with perfect prefix
+  caching (cache reads at 0.1×, writes at 1.25×, output at 5× the fresh-input price). Caching changes the
+  price of a re-sent token, not how often it is sent.
 
 Full figures and tables: [results/summary.md](results/summary.md).
 
@@ -65,7 +80,7 @@ the median task's RDF by 0.01 points.
 
 **Google Colab, no install.** Open [`notebooks/rdf_tier0_colab.ipynb`](notebooks/rdf_tier0_colab.ipynb) in
 [Colab](https://colab.research.google.com/) and choose *Runtime → Run all*. The full run takes about
-30 minutes on the free CPU; set `SAMPLE_FRAC = 0.05` for a 3-minute trial.
+55 minutes on the free CPU; set `SAMPLE_FRAC = 0.05` for a 3-minute trial.
 
 **Locally** (Python 3.9+, about 3 GB of free disk):
 
@@ -92,8 +107,9 @@ Outputs land in `results/`:
   invoices, and chat-template tokens (role markers and the like) are not counted.
 - **One harness, one model, one domain.** OpenHands and Qwen3-Coder on coding tasks. The enterprise
   workflows the thesis is about are not measured here.
-- **Loop length does most of the work in an append-only harness.** Harnesses that condense, truncate or
-  retrieve context are where RDF should separate designs; comparing them is the next tier.
+- **This run does not show that RDF separates agent designs**, which the thesis sets as Tier 0's aim. Within
+  one append-only harness, loop length alone predicts it. Harnesses that condense, truncate or retrieve
+  context are where it should separate designs; comparing them is the next step.
 - **CACS is modeled**: perfect prefix caching, cache reads at 0.1× and writes at 1.25× the fresh-input
   price, output at 5×. Real caches expire and miss.
 

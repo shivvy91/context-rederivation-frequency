@@ -353,91 +353,93 @@ def plot(con, out_dir: str | Path = "results", tokenizer: str = "o200k", min_tas
 
     W, H, DPI = 8.0, 6.7, 200
     bar_rect = [0.09, 0.772, 0.88, 0.045]
-    line_rect = [0.09, 0.12, 0.88, 0.43]
+    line_rect = [0.09, 0.15, 0.88, 0.425]
+    footer = (f"Data: {DATASET} (CC-BY-4.0). Tokens: {TOKENIZERS[tokenizer].split(' (')[0]}.\n"
+              f"Axis starts at {y_lo * 100:.0f}%. Call counts with at least {min_tasks} tasks shown.")
     out = Path(out_dir)
     paths = []
-    for mode, c in THEMES.items():
-        fig = plt.figure(figsize=(W, H), dpi=DPI)
-        fig.patch.set_facecolor(c["surface"])
-        renderer = fig.canvas.get_renderer()
+    # DejaVu Sans ships with matplotlib, so the charts come out identical on Colab and on any machine.
+    with plt.rc_context({"font.family": "DejaVu Sans"}):
+        for mode, c in THEMES.items():
+            fig = plt.figure(figsize=(W, H), dpi=DPI)
+            fig.patch.set_facecolor(c["surface"])
+            renderer = fig.canvas.get_renderer()
 
-        fig.text(0.09, 0.95, "Context re-derivation in coding-agent loops", fontsize=13.5,
-                 fontweight="bold", color=c["ink"])
-        fig.text(0.09, 0.913, f"{s['tasks']:,} OpenHands trajectories (Qwen3-Coder-480B) · "
-                 f"{_big(s['input_tokens_total'])} input tokens sent to the model", fontsize=9, color=c["ink2"])
+            fig.text(0.09, 0.95, "Context re-derivation in coding-agent loops", fontsize=13.5,
+                     fontweight="bold", color=c["ink"])
+            fig.text(0.09, 0.913, f"{s['tasks']:,} OpenHands trajectories (Qwen3-Coder-480B) · "
+                     f"{_big(s['input_tokens_total'])} input tokens sent to the model", fontsize=9, color=c["ink2"])
 
-        # Panel 1: one whole, split into parts.
-        fig.text(0.09, 0.84, "Where the input tokens went", fontsize=10, fontweight="bold", color=c["ink"])
-        bx = fig.add_axes(bar_rect)
-        bx.set_xlim(0, 1)
-        bx.set_ylim(0, 1)
-        bx.axis("off")
-        px_w = bar_rect[2] * W * DPI
-        px_h = bar_rect[3] * H * DPI
-        gap, radius = 4 / px_w, 8 / px_w
-        x0 = 0.0
-        handles = []
-        for (label, share), color in zip(parts, c["slots"]):
-            if share <= 0:
-                continue
-            width = max(share - gap, 0.0005)
-            bx.add_patch(FancyBboxPatch((x0, 0), width, 1, boxstyle=f"round,pad=0,rounding_size={radius}",
-                                        mutation_aspect=px_w / px_h, linewidth=0, facecolor=color))
-            text = bx.text(x0 + 12 / px_w, 0.5, _pct(share), ha="left", va="center", fontsize=9,
-                           fontweight="bold", color="#ffffff")
-            if text.get_window_extent(renderer).width + 24 > width * px_w:
-                text.remove()  # too narrow to label inside; the legend and table carry it
-            handles.append(Patch(facecolor=color, label=f"{label} · {_pct(share)}"))
-            x0 += share
-        legend = bx.legend(handles=handles, loc="upper left", bbox_to_anchor=(0, -0.35), ncol=1, frameon=False,
-                           fontsize=8.3, handlelength=1.0, handleheight=1.0, borderaxespad=0, labelspacing=0.35)
-        for text in legend.get_texts():
-            text.set_color(c["ink2"])
+            # Panel 1: one whole, split into parts.
+            fig.text(0.09, 0.84, "Where the input tokens went", fontsize=10, fontweight="bold", color=c["ink"])
+            bx = fig.add_axes(bar_rect)
+            bx.set_xlim(0, 1)
+            bx.set_ylim(0, 1)
+            bx.axis("off")
+            px_w = bar_rect[2] * W * DPI
+            px_h = bar_rect[3] * H * DPI
+            gap, radius = 4 / px_w, 8 / px_w
+            x0 = 0.0
+            handles = []
+            for (label, share), color in zip(parts, c["slots"]):
+                if share <= 0:
+                    continue
+                width = max(share - gap, 0.0005)
+                bx.add_patch(FancyBboxPatch((x0, 0), width, 1, boxstyle=f"round,pad=0,rounding_size={radius}",
+                                            mutation_aspect=px_w / px_h, linewidth=0, facecolor=color))
+                text = bx.text(x0 + 12 / px_w, 0.5, _pct(share), ha="left", va="center", fontsize=9,
+                               fontweight="bold", color="#ffffff")
+                if text.get_window_extent(renderer).width + 24 > width * px_w:
+                    text.remove()  # too narrow to label inside; the legend and table carry it
+                handles.append(Patch(facecolor=color, label=f"{label} · {_pct(share)}"))
+                x0 += share
+            legend = bx.legend(handles=handles, loc="upper left", bbox_to_anchor=(0, -0.35), ncol=1,
+                               frameon=False, fontsize=8.3, handlelength=1.0, handleheight=1.0, borderaxespad=0,
+                               labelspacing=0.35)
+            for text in legend.get_texts():
+                text.set_color(c["ink2"])
 
-        # Panel 2: RDF by task length, against the closed form.
-        fig.text(0.09, 0.585, "Share of each task's input already sent earlier in that task, by task length",
-                 fontsize=10, fontweight="bold", color=c["ink"])
-        ax = fig.add_axes(line_rect)
-        ax.set_facecolor(c["surface"])
-        series = c["slots"][0]
-        ax.fill_between(n, p10, p90, color=series, alpha=0.14 if mode == "light" else 0.26, linewidth=0,
-                        label="10th–90th percentile of tasks")
-        ax.plot(model_x, model, color=c["ink2"], linewidth=1.5, linestyle=(0, (4, 3)),
-                label="Uniform-loop model, 1 − 2/(n+1)")
-        ax.plot(n, p50, color=series, linewidth=2, solid_capstyle="round", solid_joinstyle="round",
-                label="Median task")
-        ax.plot([n[-1]], [p50[-1]], marker="o", markersize=6, color=series,
-                markeredgecolor=c["surface"], markeredgewidth=2)
-        ax.annotate(f"Median at {n[-1]} calls: {_pct(p50[-1])}", (n[-1], p50[-1]), xytext=(-8, 8),
-                    textcoords="offset points",
-                    ha="right", va="bottom", fontsize=8.5, color=c["ink"])
-        k = min(len(model_x) - 1, 5)
-        ax.annotate("Uniform-loop model", (model_x[k], model[k]), xytext=(6, -8), textcoords="offset points",
-                    ha="left", va="top", fontsize=8.5, color=c["ink2"])
+            # Panel 2: RDF by task length, against the closed form.
+            fig.text(0.09, 0.615, "Share of each task's input already sent earlier in that task, by task length",
+                     fontsize=10, fontweight="bold", color=c["ink"])
+            ax = fig.add_axes(line_rect)
+            ax.set_facecolor(c["surface"])
+            series = c["slots"][0]
+            ax.fill_between(n, p10, p90, color=series, alpha=0.14 if mode == "light" else 0.26, linewidth=0,
+                            label="10th–90th percentile of tasks")
+            ax.plot(model_x, model, color=c["ink2"], linewidth=1.5, linestyle=(0, (4, 3)),
+                    label="Uniform-loop model, 1 − 2/(n+1)")
+            ax.plot(n, p50, color=series, linewidth=2, solid_capstyle="round", solid_joinstyle="round",
+                    label="Median task")
+            ax.plot([n[-1]], [p50[-1]], marker="o", markersize=6, color=series,
+                    markeredgecolor=c["surface"], markeredgewidth=2)
+            ax.annotate(f"Median at {n[-1]} calls: {_pct(p50[-1])}", (n[-1], p50[-1]), xytext=(-8, 8),
+                        textcoords="offset points", ha="right", va="bottom", fontsize=8.5, color=c["ink"])
+            k = min(len(model_x) - 1, 5)
+            ax.annotate("Uniform-loop model", (model_x[k], model[k]), xytext=(6, -6), textcoords="offset points",
+                        ha="left", va="top", fontsize=8.5, color=c["ink2"])
 
-        ax.set_xlim(n[0] - 1, n[-1] + 2)
-        ax.set_ylim(y_lo, 1.0)
-        ax.yaxis.set_major_locator(FixedLocator(y_ticks))
-        ax.yaxis.set_major_formatter(PercentFormatter(xmax=1.0, decimals=0))
-        ax.xaxis.set_major_locator(FixedLocator(x_ticks))
-        ax.grid(axis="y", color=c["grid"], linewidth=0.8)
-        ax.set_axisbelow(True)
-        for side in ("top", "right", "left"):
-            ax.spines[side].set_visible(False)
-        ax.spines["bottom"].set_color(c["axis"])
-        ax.tick_params(colors=c["muted"], labelsize=8.5, length=0, pad=6)
-        ax.set_xlabel("Model calls in the task", color=c["ink2"], fontsize=9, labelpad=8)
-        legend = ax.legend(loc="lower right", frameon=False, fontsize=8.3, handlelength=2.2)
-        for text in legend.get_texts():
-            text.set_color(c["ink2"])
+            ax.set_xlim(n[0] - 1, n[-1] + 2)
+            ax.set_ylim(y_lo, 1.0)
+            ax.yaxis.set_major_locator(FixedLocator(y_ticks))
+            ax.yaxis.set_major_formatter(PercentFormatter(xmax=1.0, decimals=0))
+            ax.xaxis.set_major_locator(FixedLocator(x_ticks))
+            ax.grid(axis="y", color=c["grid"], linewidth=0.8)
+            ax.set_axisbelow(True)
+            for side in ("top", "right", "left"):
+                ax.spines[side].set_visible(False)
+            ax.spines["bottom"].set_color(c["axis"])
+            ax.tick_params(colors=c["muted"], labelsize=8.5, length=0, pad=6)
+            ax.set_xlabel("Model calls in the task", color=c["ink2"], fontsize=9, labelpad=8)
+            legend = ax.legend(loc="lower right", frameon=False, fontsize=8.3, handlelength=2.2)
+            for text in legend.get_texts():
+                text.set_color(c["ink2"])
 
-        fig.text(0.09, 0.02, f"Data: {DATASET} (CC-BY-4.0). Tokens: {TOKENIZERS[tokenizer].split(' (')[0]}."
-                 f" Axis starts at {y_lo * 100:.0f}%. Call counts with at least {min_tasks} tasks shown.",
-                 fontsize=7.3, color=c["muted"])
-        path = out / ("rdf_vs_calls.png" if mode == "light" else "rdf_vs_calls_dark.png")
-        fig.savefig(path, facecolor=c["surface"])
-        plt.close(fig)
-        paths.append(path)
+            fig.text(0.09, 0.016, footer, fontsize=7.3, color=c["muted"], va="bottom", linespacing=1.5)
+            path = out / ("rdf_vs_calls.png" if mode == "light" else "rdf_vs_calls_dark.png")
+            fig.savefig(path, facecolor=c["surface"])
+            plt.close(fig)
+            paths.append(path)
     return paths
 
 
